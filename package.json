@@ -1,0 +1,48 @@
+{
+  "name": "lotteryrandomizer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "ingest": "tsx scripts/ingest.ts",
+    "fixture": "tsx scripts/make-fixture.ts",
+    "typecheck": "tsc --noEmit",
+    "verify": "tsx scripts/verify-ui.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/revelationnow/LotteryRandomizer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/revelationnow/LotteryRandomizer/issues"
+  },
+  "homepage": "https://github.com/revelationnow/LotteryRandomizer#readme",
+  "dependencies": {
+    "framer-motion": "^13.1.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2",
+    "tailwindcss": "^4.3.3",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
+    "playwright": "^1.62.1",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
+  },
+  "type": "module"
+}

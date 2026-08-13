@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-08-13T10:33:14.709Z",
+  "source": "fixture",
+  "games": {
+    "powerball": {
+      "draws": 1984,
+      "latestDraw": "2026-08-12"
+    },
+    "megamillions": {
+      "draws": 2530,
+      "latestDraw": "2026-08-11"
+    }
+  }
+}

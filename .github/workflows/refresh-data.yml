@@ -1,0 +1,50 @@
+name: Refresh draw history
+
+on:
+  # Powerball draws Mon/Wed/Sat and Mega Millions Tue/Fri, all late evening US
+  # Eastern. A single daily run at 07:00 UTC lands after every one of them.
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Fails the job if any ball falls outside the matrix in force on its draw
+      # date, so a wrong era boundary can never reach the site.
+      - name: Fetch official results
+        env:
+          SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
+        run: npm run ingest
+
+      - name: Verify the snapshot still passes the test suite
+        run: npm test
+
+      - name: Commit if the data changed
+        run: |
+          if git diff --quiet -- public/data; then
+            echo "No new draws."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data
+          git commit -m "chore(data): refresh draw history"
+          git push
