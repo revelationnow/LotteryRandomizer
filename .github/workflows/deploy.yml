@@ -32,7 +32,11 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run typecheck
+      # A GitHub Pages project site lives under /<repo>/, unlike Cloudflare Pages
+      # which serves from the root.
       - run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
 
       # One-time manual step before this can succeed: Settings -> Pages -> Source
       # -> "GitHub Actions". The default GITHUB_TOKEN can deploy to Pages but is

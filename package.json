@@ -12,7 +12,8 @@
     "fixture": "tsx scripts/make-fixture.ts",
     "typecheck": "tsc --noEmit",
     "verify": "tsx scripts/verify-ui.ts",
-    "standalone": "tsx scripts/build-standalone.ts"
+    "standalone": "tsx scripts/build-standalone.ts",
+    "ci": "npm run typecheck && npm test && npm run build"
   },
   "repository": {
     "type": "git",

@@ -101,11 +101,47 @@ npm run ingest    # optional: set SOCRATA_APP_TOKEN to raise the rate limit
 | --- | --- |
 | `npm run dev` | Dev server |
 | `npm run build` | Production build |
+| `npm run ci` | Typecheck, test, build — what the hosts run |
 | `npm test` | Unit tests for the statistical core |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run ingest` | Fetch official results into `public/data/` |
 | `npm run fixture` | Generate synthetic offline data |
+| `npm run standalone` | Single self-contained HTML file, no network requests |
 | `npm run verify` | Browser checks and screenshots (needs a running preview) |
+
+## Deploying
+
+### Cloudflare Pages
+
+In the Cloudflare dashboard: **Workers & Pages → Create → Pages → Connect to Git**, pick
+this repository, and set:
+
+| Setting | Value |
+| --- | --- |
+| Build command | `npm run ci` |
+| Build output directory | `dist` |
+| Node version | picked up from `.node-version` (22) |
+
+No environment variables are needed — `base` defaults to `/`, which is what Cloudflare serves
+from. Using `npm run ci` rather than `npm run build` means a failing test blocks the deploy.
+
+The two halves fit together on their own: the scheduled refresh workflow commits new draws to
+the repository, and that commit triggers a Cloudflare rebuild. No API tokens, and nothing to
+keep in sync.
+
+`public/_headers` sets the cache policy. It matters more than it looks — Vite fingerprints the
+files in `/assets`, so they are immutable, but `/data/*.json` keeps the same filenames while the
+refresh job rewrites them. Without a short max-age there, the edge would keep serving last
+week's draws.
+
+### GitHub Pages
+
+Also wired up, via `.github/workflows/deploy.yml`. It needs one manual step first —
+**Settings → Pages → Source → "GitHub Actions"** — because the workflow's `GITHUB_TOKEN` can
+deploy to an existing Pages site but is not permitted to create one.
+
+A GitHub Pages project site is served from `/<repo>/` rather than the root, so the workflow
+sets `BASE_PATH` when building. Both hosts build from the same source.
 
 ## Verification
 

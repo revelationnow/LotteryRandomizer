@@ -1,0 +1,19 @@
+# Cloudflare Pages caching rules. Vite copies this file to the build output root.
+# GitHub Pages ignores it, which is harmless.
+
+# Vite fingerprints these filenames, so they can be cached forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The draw history is NOT fingerprinted — the refresh job rewrites the same paths
+# a few times a week. Without this it would sit in edge and browser caches and the
+# app would keep weighting on yesterday's numbers.
+/data/*
+  Cache-Control: public, max-age=300, must-revalidate
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
