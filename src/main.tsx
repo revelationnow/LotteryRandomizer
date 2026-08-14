@@ -1,15 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { HashRouter } from 'react-router-dom';
 import { App } from './App';
 import './index.css';
 
-// HashRouter rather than BrowserRouter: GitHub Pages serves static files with no
-// SPA fallback, so a deep link to /observatory would 404 under history routing.
+// Routing is hash-based (see src/router.tsx) so that a deep link to a tab works
+// on any static host without server rewrite rules.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <HashRouter>
-      <App />
-    </HashRouter>
+    <App />
   </StrictMode>,
 );

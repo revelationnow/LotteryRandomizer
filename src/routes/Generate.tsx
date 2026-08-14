@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link } from '../router';
 import { useStore } from '../store';
 import { GAMES } from '../lib/games';
 import { useGameData } from '../lib/useGameData';
+import { useIsDesktop } from '../lib/useMediaQuery';
 import { generateTickets, validate, type Ticket } from '../lib/constraints';
 import { sliderToBeta } from '../lib/weights';
 import { newSeed } from '../lib/rng';
@@ -22,6 +22,7 @@ export function Generate() {
   const save = useStore((s) => s.save);
   const { data, error, loading } = useGameData(gameId);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const isDesktop = useIsDesktop();
   const [problem, setProblem] = useState<string | null>(null);
   const [spinning, setSpinning] = useState(false);
   const game = GAMES[gameId];
@@ -96,16 +97,14 @@ export function Generate() {
         <div className="glass relative overflow-hidden rounded-3xl px-4 py-8 sm:px-8 sm:py-10">
           {/* aria-live so a screen reader announces the numbers when they land. */}
           <div aria-live="polite" aria-atomic="true" className="space-y-8">
-            <AnimatePresence mode="wait">
-              {tickets.length > 0 ? (
-                <motion.div
-                  key={tickets.map((t) => `${t.white.join('-')}${t.special}`).join('|')}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="space-y-8"
-                >
-                  {tickets.map((ticket, i) => (
+            {tickets.length > 0 ? (
+              // Keying on the drawn numbers remounts the subtree each draw, which
+              // restarts the CSS fade and the orbs' staggered entrance.
+              <div
+                key={tickets.map((t) => `${t.white.join('-')}${t.special}`).join('|')}
+                className="fade-in space-y-8"
+              >
+                {tickets.map((ticket, i) => (
                     <TicketRow
                       key={i}
                       ticket={ticket}
@@ -123,12 +122,11 @@ export function Generate() {
                         })
                       }
                     />
-                  ))}
-                </motion.div>
-              ) : (
-                <EmptyStage key="empty" count={game.whiteCount} />
-              )}
-            </AnimatePresence>
+                ))}
+              </div>
+            ) : (
+              <EmptyStage count={game.whiteCount} />
+            )}
           </div>
         </div>
 
@@ -188,19 +186,29 @@ export function Generate() {
         {data && <FairnessNote pValue={data.whiteChi.pValue} draws={data.white.draws} />}
       </div>
 
-      {/* Desktop sidebar; the same controls appear in a sheet on mobile. */}
-      <aside className="hidden md:block">
-        <Panel title="Tune your luck" className="sticky top-24">
-          <LuckPanel gameId={gameId} />
-        </Panel>
-      </aside>
+      {/* Desktop sidebar; the same controls appear in a sheet on mobile. Gated on
+          the media query rather than a `hidden md:block` class so a phone never
+          builds this subtree at all. */}
+      {isDesktop && (
+        <aside>
+          <Panel title="Tune your luck" className="sticky top-24">
+            <LuckPanel gameId={gameId} />
+          </Panel>
+        </aside>
+      )}
 
-      <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Tune your luck">
-        <LuckPanel gameId={gameId} />
-        <Button variant="primary" className="mt-6 min-h-14 w-full" onClick={() => setSheetOpen(false)}>
-          Done
-        </Button>
-      </BottomSheet>
+      {!isDesktop && (
+        <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Tune your luck">
+          <LuckPanel gameId={gameId} />
+          <Button
+            variant="primary"
+            className="mt-6 min-h-14 w-full"
+            onClick={() => setSheetOpen(false)}
+          >
+            Done
+          </Button>
+        </BottomSheet>
+      )}
     </div>
   );
 }
@@ -301,12 +309,7 @@ function TicketRow({
 
 function EmptyStage({ count }: { count: number }) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="flex flex-col items-center gap-5 py-4 text-center"
-    >
+    <div className="fade-in flex flex-col items-center gap-5 py-4 text-center">
       <div aria-hidden className="mx-auto w-full max-w-md">
         <ul className="grid grid-cols-5 gap-2 sm:gap-3">
           {Array.from({ length: count }, (_, i) => (
@@ -323,7 +326,7 @@ function EmptyStage({ count }: { count: number }) {
       <p className="max-w-sm text-sm text-balance text-muted">
         Your numbers will appear here. Tune the bias first, or just draw a perfectly fair set.
       </p>
-    </motion.div>
+    </div>
   );
 }
 

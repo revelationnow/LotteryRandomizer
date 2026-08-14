@@ -26,6 +26,43 @@ const cache = new Map<GameId, Snapshot>();
 let manifestCache: Manifest | null = null;
 
 /**
+ * Derived statistics, keyed by the snapshot they came from.
+ *
+ * Several components on a screen use the same game, and each useMemo would
+ * otherwise tally every draw again. A WeakMap keyed on the snapshot object means
+ * the work happens once and is released when the snapshot is.
+ */
+const derived = new WeakMap<Snapshot, GameData>();
+
+function derive(gameId: GameId, snapshot: Snapshot, manifest: Manifest): GameData {
+  const hit = derived.get(snapshot);
+  if (hit) return hit;
+
+  // Marks are near-free and make it possible to see, in a real profile on a real
+  // device, whether a slow first paint is the network, the tally, or React.
+  performance.mark('orrery:derive-start');
+  const game = GAMES[gameId];
+  const era = game.eras[0];
+  const white = whiteStats(eligibleWhiteDraws(game, snapshot.draws), era.whiteMax);
+  const special = specialStats(eligibleSpecialDraws(game, snapshot.draws), era.specialMax);
+
+  const value: GameData = {
+    snapshot,
+    manifest,
+    white,
+    special,
+    whiteChi: chiSquare(white),
+    specialChi: chiSquare(special),
+    totalDraws: snapshot.draws.length,
+    latestDraw: manifest.games[gameId]?.latestDraw ?? null,
+  };
+  derived.set(snapshot, value);
+  performance.mark('orrery:derive-end');
+  performance.measure('orrery:derive', 'orrery:derive-start', 'orrery:derive-end');
+  return value;
+}
+
+/**
  * Load a game's snapshot and derive its statistics.
  *
  * Only draws from the matrix currently in force feed the weights — see
@@ -60,27 +97,10 @@ export function useGameData(gameId: GameId) {
     };
   }, [gameId]);
 
-  const data = useMemo<GameData | null>(() => {
-    if (!snapshot || !manifest) return null;
-    const game = GAMES[gameId];
-    const era = game.eras[0];
-
-    const whiteDraws = eligibleWhiteDraws(game, snapshot.draws);
-    const specialDraws = eligibleSpecialDraws(game, snapshot.draws);
-    const white = whiteStats(whiteDraws, era.whiteMax);
-    const special = specialStats(specialDraws, era.specialMax);
-
-    return {
-      snapshot,
-      manifest,
-      white,
-      special,
-      whiteChi: chiSquare(white),
-      specialChi: chiSquare(special),
-      totalDraws: snapshot.draws.length,
-      latestDraw: manifest.games[gameId]?.latestDraw ?? null,
-    };
-  }, [snapshot, manifest, gameId]);
+  const data = useMemo<GameData | null>(
+    () => (snapshot && manifest ? derive(gameId, snapshot, manifest) : null),
+    [snapshot, manifest, gameId],
+  );
 
   return { data, error, loading: !data && !error };
 }

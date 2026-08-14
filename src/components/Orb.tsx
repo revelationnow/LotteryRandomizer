@@ -1,4 +1,4 @@
-import { motion, useReducedMotion } from 'framer-motion';
+import type { CSSProperties } from 'react';
 
 export type OrbSize = 'sm' | 'md' | 'lg' | 'fill';
 export type OrbTone = 'white' | 'special';
@@ -26,10 +26,10 @@ interface Props {
  * A single numbered ball, rendered as luminous glass.
  *
  * White balls are a pale violet-white; the special ball takes the game's accent
- * (Powerball red, Mega Ball gold).
+ * (Powerball red, Mega Ball gold). The entrance is a CSS keyframe — see .orb-in —
+ * staggered by index through a custom property.
  */
 export function Orb({ value, tone = 'white', size = 'lg', index = 0, accent, label }: Props) {
-  const reduced = useReducedMotion();
   const isSpecial = tone === 'special' && accent;
 
   const background = isSpecial
@@ -39,20 +39,15 @@ export function Orb({ value, tone = 'white', size = 'lg', index = 0, accent, lab
   const glow = isSpecial ? accent.glow : '167, 139, 250';
 
   return (
-    <motion.div
-      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 34, scale: 0.6 }}
-      animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-      transition={
-        reduced
-          ? { duration: 0.2 }
-          : // A little overshoot so the orb settles rather than stopping dead.
-            { type: 'spring', stiffness: 320, damping: 18, mass: 0.7, delay: index * 0.09 }
+    <div
+      className={`${SIZES[size]} orb-in relative grid shrink-0 place-items-center rounded-full font-display font-bold tabular text-void select-none`}
+      style={
+        {
+          background,
+          boxShadow: `0 0 28px rgba(${glow},0.5), 0 6px 20px rgba(0,0,0,0.55), inset 0 -6px 14px rgba(0,0,0,0.22), inset 0 4px 10px rgba(255,255,255,0.7)`,
+          '--orb-delay': `${index * 90}ms`,
+        } as CSSProperties
       }
-      className={`${SIZES[size]} relative grid shrink-0 place-items-center rounded-full font-display font-bold tabular text-void select-none`}
-      style={{
-        background,
-        boxShadow: `0 0 28px rgba(${glow},0.5), 0 6px 20px rgba(0,0,0,0.55), inset 0 -6px 14px rgba(0,0,0,0.22), inset 0 4px 10px rgba(255,255,255,0.7)`,
-      }}
       role="img"
       aria-label={label ?? `${isSpecial ? 'Special ball' : 'Number'} ${value}`}
     >
@@ -62,6 +57,6 @@ export function Orb({ value, tone = 'white', size = 'lg', index = 0, accent, lab
         className="pointer-events-none absolute top-[12%] left-[18%] h-[26%] w-[34%] rounded-full bg-white/70 blur-[3px]"
       />
       <span className="relative">{value}</span>
-    </motion.div>
+    </div>
   );
 }

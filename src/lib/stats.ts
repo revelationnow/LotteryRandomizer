@@ -36,8 +36,9 @@ export function tally(
   const counts = new Array<number>(size + 1).fill(0);
   const lastSeen = new Array<number>(size + 1).fill(-1);
 
-  // Sort ascending by date so "draws since" is measured from the end.
-  const ordered = [...draws].sort((a, b) => a[0] - b[0]);
+  // "Draws since" is measured from the end, so order matters. The ingest already
+  // writes draws ascending, so check before paying for a copy and a sort.
+  const ordered = isAscending(draws) ? draws : [...draws].sort((a, b) => a[0] - b[0]);
 
   ordered.forEach((d, i) => {
     for (const ball of pick(d)) {
@@ -64,6 +65,13 @@ export function tally(
     drought,
     latestDraw: n > 0 ? ordered[n - 1][0] : null,
   };
+}
+
+function isAscending(draws: DrawTuple[]): boolean {
+  for (let i = 1; i < draws.length; i++) {
+    if (draws[i][0] < draws[i - 1][0]) return false;
+  }
+  return true;
 }
 
 export function whiteStats(draws: DrawTuple[], size: number): PoolStats {

@@ -62,6 +62,10 @@ async function main() {
   // build; drop the links rather than ship guaranteed 404s.
   html = html.replace(/\s*<link rel="(manifest|icon|apple-touch-icon)"[^>]*>/g, '');
 
+  // Same for the prefetch snippet: the data is already inlined above, so those
+  // requests would only 404.
+  html = html.replace(/\s*<script id="orrery-prefetch">[\s\S]*?<\/script>/, '');
+
   mkdirSync(OUT, { recursive: true });
   writeFileSync(resolve(OUT, 'orrery.html'), html);
 

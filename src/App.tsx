@@ -1,9 +1,15 @@
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { Suspense, lazy, useEffect } from 'react';
+import { NavLink, navigate, useRoute } from './router';
 import { Starfield } from './components/Starfield';
 import { Logo } from './components/Logo';
 import { Generate } from './routes/Generate';
-import { Observatory } from './routes/Observatory';
-import { Vault } from './routes/Vault';
+
+// Generate is the landing screen and stays in the main bundle. The other two are
+// split out so their code is not parsed before the first screen is interactive.
+const Observatory = lazy(() =>
+  import('./routes/Observatory').then((m) => ({ default: m.Observatory })),
+);
+const Vault = lazy(() => import('./routes/Vault').then((m) => ({ default: m.Vault })));
 import { useStore } from './store';
 import { GAMES, GAME_IDS } from './lib/games';
 
@@ -23,12 +29,9 @@ export function App() {
         {/* The disclaimer lives inside main so a single pb-navbar keeps every last
             element clear of the fixed mobile tab bar. */}
         <main className="pb-navbar mx-auto w-full max-w-5xl flex-1 px-4 pt-4 sm:px-6 md:pb-16">
-          <Routes>
-            <Route path="/generate" element={<Generate />} />
-            <Route path="/observatory" element={<Observatory />} />
-            <Route path="/vault" element={<Vault />} />
-            <Route path="*" element={<Navigate to="/generate" replace />} />
-          </Routes>
+          <Suspense fallback={<RouteLoading />}>
+            <CurrentRoute />
+          </Suspense>
           <Disclaimer />
         </main>
         <TabBar />
@@ -131,6 +134,28 @@ function TabBar() {
         ))}
       </div>
     </nav>
+  );
+}
+
+function CurrentRoute() {
+  const path = useRoute();
+
+  // Anything unrecognised — including the bare "/" a first-time visitor lands on
+  // — settles on the generator.
+  useEffect(() => {
+    if (!TABS.some((t) => t.to === path)) navigate('/generate', true);
+  }, [path]);
+
+  if (path === '/observatory') return <Observatory />;
+  if (path === '/vault') return <Vault />;
+  return <Generate />;
+}
+
+function RouteLoading() {
+  return (
+    <div role="status" className="grid min-h-64 place-items-center text-sm text-muted">
+      Loading…
+    </div>
   );
 }
 

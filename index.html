@@ -20,6 +20,37 @@
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      Start the data request before the bundle parses.
+
+      The app used to fetch inside a useEffect, so the request could not begin
+      until React had mounted — on a slow phone that serialised roughly a second
+      of script evaluation ahead of a request that itself takes milliseconds.
+      Kicking it off here overlaps the two.
+
+      Paths are relative on purpose: they resolve against the deployment root on
+      both a domain root and a GitHub Pages subpath, and hash routing means the
+      document URL is always that root. The standalone build strips this block,
+      since it carries its data inline.
+    -->
+    <script id="orrery-prefetch">
+      (function () {
+        var get = function (path) {
+          return fetch(new URL(path, document.baseURI))
+            .then(function (r) {
+              return r.ok ? r.json() : null;
+            })
+            .catch(function () {
+              return null;
+            });
+        };
+        window.__ORRERY_PREFETCH__ = {
+          manifest: get('data/manifest.json'),
+          powerball: get('data/powerball.json'),
+          megamillions: get('data/megamillions.json'),
+        };
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -80,22 +80,61 @@ function embedded(): EmbeddedData | undefined {
   return (globalThis as { __ORRERY_DATA__?: EmbeddedData }).__ORRERY_DATA__;
 }
 
-export async function loadSnapshot(game: GameId): Promise<Snapshot> {
-  const inline = embedded()?.snapshots[game];
-  if (inline) return inline;
+/**
+ * Requests started by the inline snippet in index.html, before this bundle even
+ * parsed. Each resolves to null if it failed, so we fall back to a normal fetch.
+ */
+type Prefetch = Partial<Record<GameId | 'manifest', Promise<unknown | null>>>;
 
-  const res = await fetch(`${BASE}data/${game}.json`);
-  if (!res.ok) throw new Error(`Could not load ${game} draw history (${res.status})`);
-  return (await res.json()) as Snapshot;
+function prefetched(key: GameId | 'manifest'): Promise<unknown | null> | undefined {
+  return (globalThis as { __ORRERY_PREFETCH__?: Prefetch }).__ORRERY_PREFETCH__?.[key];
 }
 
-export async function loadManifest(): Promise<Manifest> {
-  const inline = embedded()?.manifest;
-  if (inline) return inline;
+/**
+ * In-flight requests, keyed by file. Several components ask for the same game on
+ * first render; caching the promise rather than only the result means they share
+ * one request instead of racing to issue duplicates.
+ */
+const inFlight = new Map<string, Promise<unknown>>();
 
-  const res = await fetch(`${BASE}data/manifest.json`);
-  if (!res.ok) throw new Error(`Could not load data manifest (${res.status})`);
-  return (await res.json()) as Manifest;
+function once<T>(key: string, start: () => Promise<T>): Promise<T> {
+  const existing = inFlight.get(key);
+  if (existing) return existing as Promise<T>;
+  const p = start().catch((err: unknown) => {
+    // A failure should not be cached, or a transient blip is permanent.
+    inFlight.delete(key);
+    throw err;
+  });
+  inFlight.set(key, p);
+  return p;
+}
+
+export function loadSnapshot(game: GameId): Promise<Snapshot> {
+  const inline = embedded()?.snapshots[game];
+  if (inline) return Promise.resolve(inline);
+
+  return once(game, async () => {
+    const early = (await prefetched(game)) as Snapshot | null | undefined;
+    if (early) return early;
+
+    const res = await fetch(`${BASE}data/${game}.json`);
+    if (!res.ok) throw new Error(`Could not load ${game} draw history (${res.status})`);
+    return (await res.json()) as Snapshot;
+  });
+}
+
+export function loadManifest(): Promise<Manifest> {
+  const inline = embedded()?.manifest;
+  if (inline) return Promise.resolve(inline);
+
+  return once('manifest', async () => {
+    const early = (await prefetched('manifest')) as Manifest | null | undefined;
+    if (early) return early;
+
+    const res = await fetch(`${BASE}data/manifest.json`);
+    if (!res.ok) throw new Error(`Could not load data manifest (${res.status})`);
+    return (await res.json()) as Manifest;
+  });
 }
 
 export function gameOf(id: GameId): GameDef {
