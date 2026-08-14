@@ -28,19 +28,54 @@ describe('eraForDate', () => {
   });
 
   it('has no gaps or overlaps between consecutive eras', () => {
+    // An earlier version of this test only asserted older.to < newer.from, which
+    // a gap satisfies just as happily as adjacency — and a real gap did slip
+    // through: the Powerball draw on 2012-01-14 belonged to no era, so ingest
+    // rejected the whole dataset. Assert exact day-adjacency instead.
+    const dayAfter = (iso: string) => {
+      const d = new Date(`${iso}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + 1);
+      return d.toISOString().slice(0, 10);
+    };
+
     for (const id of GAME_IDS) {
       const eras = GAMES[id].eras;
       for (let i = 0; i < eras.length - 1; i++) {
         const newer = eras[i];
         const older = eras[i + 1];
         expect(older.to).not.toBeNull();
-        // The older era must end strictly before the newer one starts.
-        expect(older.to! < newer.from).toBe(true);
+        expect(dayAfter(older.to!)).toBe(newer.from);
       }
       // Only the newest era is open-ended.
       expect(eras[0].to).toBeNull();
       expect(eras.slice(1).every((e) => e.to !== null)).toBe(true);
     }
+  });
+
+  it('covers every date from the start of the table onwards', () => {
+    // Walk week by week; a single uncovered date is enough to fail ingest.
+    for (const id of GAME_IDS) {
+      const eras = GAMES[id].eras;
+      const start = new Date(`${eras[eras.length - 1].from}T00:00:00Z`);
+      const end = new Date();
+      for (const d = start; d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+        const iso = d.toISOString().slice(0, 10);
+        expect(eraForDate(GAMES[id], iso), `${id} has no era for ${iso}`).not.toBeNull();
+      }
+    }
+  });
+
+  it('places the final draw before the 2012 Powerball price change correctly', () => {
+    // Regression: the $2 matrix went on sale 2012-01-15 and was first drawn on the
+    // 18th, so the Saturday 14th draw is still the old 5/59 + 1/39 game.
+    expect(eraForDate(GAMES.powerball, '2012-01-14')).toMatchObject({
+      whiteMax: 59,
+      specialMax: 39,
+    });
+    expect(eraForDate(GAMES.powerball, '2012-01-15')).toMatchObject({
+      whiteMax: 59,
+      specialMax: 35,
+    });
   });
 
   it('exposes the live matrix as the current era', () => {

@@ -16,7 +16,14 @@ export type GameId = 'powerball' | 'megamillions';
 export interface Era {
   /** Inclusive ISO start date of this matrix. */
   from: string;
-  /** Inclusive ISO end date, or null for the currently running era. */
+  /**
+   * Inclusive ISO end date, or null for the currently running era.
+   *
+   * This is the day before the next era begins, NOT the date of the last draw
+   * under this matrix — the two differ whenever a rule change lands mid-week, and
+   * using the last-draw date leaves dates that belong to no era at all. Keeping
+   * the ranges contiguous means every draw date resolves.
+   */
   to: string | null;
   /** Highest white ball; the pool is always 1..whiteMax. */
   whiteMax: number;
@@ -60,9 +67,11 @@ export const GAMES: Record<GameId, GameDef> = {
       // 5/69 + 1/26 — current matrix.
       { from: '2015-10-07', to: null, whiteMax: 69, specialMax: 26 },
       // 5/59 + 1/35.
-      { from: '2012-01-15', to: '2015-10-04', whiteMax: 59, specialMax: 35 },
-      // 5/59 + 1/39 — the dataset begins in 2010, partway through this era.
-      { from: '2009-01-07', to: '2012-01-11', whiteMax: 59, specialMax: 39 },
+      { from: '2012-01-15', to: '2015-10-06', whiteMax: 59, specialMax: 35 },
+      // 5/59 + 1/39 — the dataset begins in 2010, partway through this era. Note
+      // the Saturday 2012-01-14 draw belongs here: the $2 matrix went on sale on
+      // the 15th, first drawn on the 18th.
+      { from: '2009-01-07', to: '2012-01-14', whiteMax: 59, specialMax: 39 },
     ],
     whiteWeightingFrom: '2015-10-07',
     specialWeightingFrom: '2015-10-07',
@@ -80,13 +89,13 @@ export const GAMES: Record<GameId, GameDef> = {
       // 5/70 + 1/24 — Mega Ball 25 retired, ticket price rose to $5.
       { from: '2025-04-08', to: null, whiteMax: 70, specialMax: 24 },
       // 5/70 + 1/25.
-      { from: '2017-10-31', to: '2025-04-04', whiteMax: 70, specialMax: 25 },
+      { from: '2017-10-31', to: '2025-04-07', whiteMax: 70, specialMax: 25 },
       // 5/75 + 1/15.
-      { from: '2013-10-22', to: '2017-10-28', whiteMax: 75, specialMax: 15 },
+      { from: '2013-10-22', to: '2017-10-30', whiteMax: 75, specialMax: 15 },
       // 5/56 + 1/46.
-      { from: '2005-06-24', to: '2013-10-18', whiteMax: 56, specialMax: 46 },
+      { from: '2005-06-24', to: '2013-10-21', whiteMax: 56, specialMax: 46 },
       // 5/52 + 1/52 — earliest rows in the dataset.
-      { from: '2002-05-17', to: '2005-06-21', whiteMax: 52, specialMax: 52 },
+      { from: '2002-05-17', to: '2005-06-23', whiteMax: 52, specialMax: 52 },
     ],
     // The white pool has been 1..70 continuously since 2017, spanning both of the
     // recent special-ball eras, so all of it is eligible.
