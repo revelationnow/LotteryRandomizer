@@ -17,7 +17,9 @@ export function ShareButton({
   bias?: number;
 }) {
   const controls = useStore((s) => s.controls);
-  const [state, setState] = useState<'idle' | 'working' | 'shared' | 'saved' | 'error'>('idle');
+  const [state, setState] = useState<
+    'idle' | 'working' | 'shared' | 'saved' | 'declined' | 'unavailable' | 'error'
+  >('idle');
   const game = GAMES[gameId];
 
   const onClick = async () => {
@@ -34,11 +36,19 @@ export function ShareButton({
         `orrery-${gameId}-${ticket.white.join('-')}.png`,
         `My ${game.name} numbers from Orrery`,
       );
-      setState(result === 'shared' ? 'shared' : 'saved');
+      setState(
+        result === 'shared'
+          ? 'shared'
+          : result === 'downloaded'
+            ? 'saved'
+            : result === 'declined'
+              ? 'declined'
+              : 'unavailable',
+      );
     } catch {
       setState('error');
     }
-    window.setTimeout(() => setState('idle'), 2200);
+    window.setTimeout(() => setState('idle'), 2600);
   };
 
   const labels = {
@@ -46,6 +56,8 @@ export function ShareButton({
     working: 'Rendering…',
     shared: 'Shared ✓',
     saved: 'Image saved ✓',
+    declined: 'Save cancelled',
+    unavailable: 'Saving is blocked here',
     error: 'Could not share',
   } as const;
 

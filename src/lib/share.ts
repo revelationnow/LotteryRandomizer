@@ -148,11 +148,30 @@ function ball(
   ctx.textBaseline = 'alphabetic';
 }
 
+/** A sandboxed host that mediates file saves on the page's behalf. */
+interface HostBridge {
+  use?: (name: string) => Promise<{ save?: (req: { filename: string; data: Blob }) => Promise<unknown> } | null>;
+}
+
+export type ShareOutcome = 'shared' | 'downloaded' | 'declined' | 'unavailable';
+
 /**
- * Offer the card to the user. Prefers the native share sheet, which is the natural
- * path on a phone, and falls back to a download everywhere else.
+ * Offer the card to the user, through whichever route this environment actually
+ * supports:
+ *
+ *   1. the native share sheet — the natural path on a phone;
+ *   2. a sandboxed host's save bridge, for embedded viewers where a plain
+ *      download link is inert;
+ *   3. an ordinary download link.
+ *
+ * Each step falls through to the next when it is unavailable, so the same code
+ * works on the deployed site and inside an embed.
  */
-export async function shareCard(blob: Blob, filename: string, text: string): Promise<'shared' | 'downloaded'> {
+export async function shareCard(
+  blob: Blob,
+  filename: string,
+  text: string,
+): Promise<ShareOutcome> {
   const file = new File([blob], filename, { type: 'image/png' });
 
   if (navigator.canShare?.({ files: [file] })) {
@@ -160,9 +179,28 @@ export async function shareCard(blob: Blob, filename: string, text: string): Pro
       await navigator.share({ files: [file], text });
       return 'shared';
     } catch (err) {
-      // A user cancelling the sheet is not an error worth reporting.
+      // Cancelling the sheet is a completed interaction, not a failure.
       if (err instanceof DOMException && err.name === 'AbortError') return 'shared';
+      // Anything else (a blocked permissions policy, say) falls through.
     }
+  }
+
+  const host = (globalThis as { claude?: HostBridge }).claude;
+  if (host?.use) {
+    try {
+      const downloads = await host.use('downloads');
+      if (downloads?.save) {
+        await downloads.save({ filename, data: blob });
+        return 'downloaded';
+      }
+    } catch (err) {
+      // The viewer is asked to confirm and may say no; that is not an error.
+      const code = (err as { code?: string })?.code;
+      if (code === 'declined' || code === 'rate_limited') return 'declined';
+      return 'unavailable';
+    }
+    // Reaching here means the host exists but grants no save route.
+    return 'unavailable';
   }
 
   const url = URL.createObjectURL(blob);

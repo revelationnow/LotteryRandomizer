@@ -7,3 +7,5 @@ coverage
 playwright-report
 test-results
 .screenshots
+dist-standalone
+.vite-standalone

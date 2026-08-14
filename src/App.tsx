@@ -1,5 +1,6 @@
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { Starfield } from './components/Starfield';
+import { Logo } from './components/Logo';
 import { Generate } from './routes/Generate';
 import { Observatory } from './routes/Observatory';
 import { Vault } from './routes/Vault';
@@ -44,7 +45,7 @@ function Header() {
     <header className="safe-top sticky top-0 z-30 border-b border-white/5 bg-void/60 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3 sm:px-6">
         <NavLink to="/generate" className="flex min-h-11 shrink-0 items-center gap-2">
-          <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" className="h-8 w-8" />
+          <Logo />
           <span className="font-display text-lg font-bold tracking-tight">Orrery</span>
         </NavLink>
 

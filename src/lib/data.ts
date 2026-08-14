@@ -66,13 +66,33 @@ export function eligibleSpecialDraws(game: GameDef, draws: DrawTuple[]): DrawTup
 
 const BASE = import.meta.env?.BASE_URL ?? '/';
 
+/**
+ * The standalone single-file build inlines the draw history on the page instead of
+ * shipping it as a separate asset, so the app works with no network requests at
+ * all. Normal builds fall through to fetching from public/data.
+ */
+interface EmbeddedData {
+  snapshots: Partial<Record<GameId, Snapshot>>;
+  manifest: Manifest;
+}
+
+function embedded(): EmbeddedData | undefined {
+  return (globalThis as { __ORRERY_DATA__?: EmbeddedData }).__ORRERY_DATA__;
+}
+
 export async function loadSnapshot(game: GameId): Promise<Snapshot> {
+  const inline = embedded()?.snapshots[game];
+  if (inline) return inline;
+
   const res = await fetch(`${BASE}data/${game}.json`);
   if (!res.ok) throw new Error(`Could not load ${game} draw history (${res.status})`);
   return (await res.json()) as Snapshot;
 }
 
 export async function loadManifest(): Promise<Manifest> {
+  const inline = embedded()?.manifest;
+  if (inline) return inline;
+
   const res = await fetch(`${BASE}data/manifest.json`);
   if (!res.ok) throw new Error(`Could not load data manifest (${res.status})`);
   return (await res.json()) as Manifest;

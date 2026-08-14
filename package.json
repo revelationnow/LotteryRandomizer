@@ -11,7 +11,8 @@
     "ingest": "tsx scripts/ingest.ts",
     "fixture": "tsx scripts/make-fixture.ts",
     "typecheck": "tsc --noEmit",
-    "verify": "tsx scripts/verify-ui.ts"
+    "verify": "tsx scripts/verify-ui.ts",
+    "standalone": "tsx scripts/build-standalone.ts"
   },
   "repository": {
     "type": "git",
@@ -42,6 +43,7 @@
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
+    "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^4.1.10"
   },
   "type": "module"
