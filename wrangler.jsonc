@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // Must match the Worker project name in the Cloudflare dashboard.
+  "name": "lotteryrandomizer",
+  "compatibility_date": "2026-08-14",
+
+  // A static-assets-only Worker: there is no `main` script, because nothing here
+  // runs server-side. `npm run ci` produces ./dist and wrangler uploads it.
+  "assets": {
+    "directory": "./dist",
+
+    // The app uses hash routing, so in practice only "/" is ever requested. This
+    // makes a direct hit on any other path serve the app instead of a 404, which
+    // keeps old links and typo'd URLs working.
+    "not_found_handling": "single-page-application"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}
