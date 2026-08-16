@@ -15,6 +15,11 @@ export interface SavedTicket extends Ticket {
 interface Controls {
   /** -100 (cold) .. 0 (fair) .. 100 (hot). */
   bias: number;
+  /**
+   * 0 (all history counts equally) .. 100 (only the last few dozen draws matter).
+   * Sets the half-life of the recency decay applied to the counts.
+   */
+  recency: number;
   pinned: number[];
   excluded: number[];
   pinnedSpecial: number | null;
@@ -41,6 +46,7 @@ interface State {
 
 const DEFAULT_CONTROLS: Controls = {
   bias: 0,
+  recency: 0,
   pinned: [],
   excluded: [],
   pinnedSpecial: null,
@@ -96,6 +102,17 @@ export const useStore = create<State>()(
       name: 'orrery',
       // Generated-but-unsaved tickets are deliberately not persisted.
       partialize: (s) => ({ game: s.game, controls: s.controls, vault: s.vault }),
+      // The default merge replaces `controls` wholesale, so anyone with settings
+      // saved before a new control existed would load it as undefined. Fill from
+      // the defaults first.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<State>;
+        return {
+          ...current,
+          ...p,
+          controls: { ...DEFAULT_CONTROLS, ...(p.controls ?? {}) },
+        };
+      },
     },
   ),
 );

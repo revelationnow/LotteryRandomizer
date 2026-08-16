@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useStore } from '../store';
 import { GAMES, type GameId } from '../lib/games';
 import { sumBounds } from '../lib/constraints';
+import { effectiveWindow, sliderToHalfLife } from '../lib/weights';
+import { useGameData } from '../lib/useGameData';
 import { newSeed, normalizeSeed } from '../lib/rng';
 import { Button, Chip } from './ui';
 
@@ -23,6 +25,7 @@ export function LuckPanel({ gameId }: { gameId: GameId }) {
   return (
     <div className="space-y-6">
       <BiasControl />
+      <RecencyControl gameId={gameId} />
 
       <Section
         label="Numbers"
@@ -212,6 +215,104 @@ function BiasControl() {
         <span>Fair</span>
         <span>Hot</span>
       </div>
+    </Section>
+  );
+}
+
+const RECENCY_PRESETS = [
+  { label: 'All time', value: 0 },
+  { label: 'Recent', value: 50 },
+  { label: 'Right now', value: 100 },
+];
+
+/**
+ * Recency decay.
+ *
+ * Pairs with the bias slider: bias sets how hard to lean on a number being hot,
+ * recency sets how recent the evidence for that has to be. Alone it changes
+ * nothing, because at bias 0 every weight is 1 regardless of the counts — the UI
+ * says so rather than leaving the user to wonder why the slider does nothing.
+ */
+function RecencyControl({ gameId }: { gameId: GameId }) {
+  const recency = useStore((s) => s.controls.recency);
+  const bias = useStore((s) => s.controls.bias);
+  const patch = useStore((s) => s.patch);
+  const { data } = useGameData(gameId);
+
+  const halfLife = sliderToHalfLife(recency);
+  const window = effectiveWindow(halfLife);
+  const available = data?.white.draws ?? 0;
+  // Cannot weigh more draws than exist, however long the half-life.
+  const effective = window == null ? available : Math.min(Math.round(window), available);
+  const game = GAMES[gameId];
+  const perDraw = game.whiteCount;
+  // How many times each number comes up on average within the effective window.
+  const perNumber = effective > 0 ? (effective * perDraw) / game.eras[0].whiteMax : 0;
+  const thin = window != null && perNumber < 12;
+
+  return (
+    <Section
+      label="Recency"
+      hint={
+        recency === 0
+          ? 'Every draw in the current matrix counts the same, however old.'
+          : `Recent draws count for more. A draw ${Math.round(halfLife!)} draws back counts half as much as the latest one.`
+      }
+    >
+      <div className="flex flex-wrap gap-2 pb-3">
+        {RECENCY_PRESETS.map((p) => (
+          <Chip key={p.label} active={recency === p.value} onClick={() => patch({ recency: p.value })}>
+            {p.label}
+          </Chip>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <StepButton label="Longer memory" onClick={() => patch({ recency: Math.max(0, recency - 5) })}>
+          −
+        </StepButton>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={recency}
+          aria-label="How much recent draws outweigh older ones"
+          aria-valuetext={
+            recency === 0 ? 'All draws count equally' : `Effectively the last ${effective} draws`
+          }
+          onChange={(e) => patch({ recency: Number(e.target.value) })}
+          style={{ touchAction: 'pan-y' }}
+          className="h-11 flex-1 cursor-pointer appearance-none bg-transparent [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-[linear-gradient(90deg,#6f7192,#a78bfa)] [&::-webkit-slider-thumb]:mt-[-9px] [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-void [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-lg [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-void [&::-moz-range-thumb]:bg-white [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-[linear-gradient(90deg,#6f7192,#a78bfa)]"
+        />
+        <StepButton label="Shorter memory" onClick={() => patch({ recency: Math.min(100, recency + 5) })}>
+          +
+        </StepButton>
+      </div>
+
+      <p className="pt-1 text-xs text-muted">
+        Weighing{' '}
+        <strong className="tabular text-ink">
+          {effective.toLocaleString()}
+        </strong>{' '}
+        draws{recency > 0 ? ' worth of evidence' : ''} — about{' '}
+        <strong className="tabular text-ink">{perNumber.toFixed(1)}</strong> appearances per number.
+      </p>
+
+      {thin && (
+        <p className="mt-2 rounded-lg border border-amber/30 bg-amber/10 px-3 py-2 text-xs leading-relaxed text-amber">
+          That is a thin sample. With this few appearances each, the gap between the hottest and
+          coldest numbers is almost entirely luck — you are picking numbers that got lucky recently,
+          which says nothing about the next draw.
+        </p>
+      )}
+
+      {recency > 0 && bias === 0 && (
+        <p className="mt-2 text-xs text-faint">
+          Bias is set to Fair, so this has no effect yet — every number is equally likely regardless
+          of how it is counted. Move the bias slider to use it.
+        </p>
+      )}
     </Section>
   );
 }

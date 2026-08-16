@@ -58,6 +58,34 @@ instead of zero.
 Because real lottery data genuinely is uniform, `r_b` sits at about 1 ± 0.1 — the exponent is
 what makes the tilt visible at all. That is honest, and the Observatory says so out loud.
 
+### Recency
+
+A second slider controls how far back the evidence counts. Rather than counting every draw
+equally, a draw `n` draws old contributes `0.5^(n/h)`, with the slider setting the half-life `h`
+(log-scaled, 5000 draws down to 20). Those decayed sums replace `c_b` above — and because the
+model is entirely ratio-based, nothing downstream changes.
+
+The two sliders are orthogonal and that is the point: **bias** sets how hard to lean on a number
+being hot, **recency** sets how recent the evidence for that has to be. Recency at 0 is exactly
+the undecayed behaviour, and at bias 0 recency does nothing at all, since every weight is 1
+regardless of the counts. The UI says so rather than leaving a slider that appears inert.
+
+Exponential decay rather than a "last N draws" cutoff: a cutoff discards everything one draw
+past the boundary while treating the draw just inside it as fully current, so weights lurch as
+new draws arrive. Decay ages evidence out smoothly.
+
+The cost is sample size, and the app reports it. Alongside the slider it shows the Kish effective
+sample size `(1+r)/(1−r)` where `r = 0.5^(1/h)` — at the shortest half-life that is about 58
+draws, or roughly 4 appearances per number, and a warning appears saying plainly that at that
+point the hot/cold gap is essentially all luck.
+
+One consequence worth knowing: **the chi-square verdict is always computed on the full undecayed
+history.** Pearson's test assumes actual counts, and on fractional decayed weights the statistic
+no longer follows a chi-square distribution. `chiSquare` throws if handed weighted stats, so the
+mistake cannot be made quietly.
+
+### Sampling
+
 Sampling five distinct balls by weight uses **Efraimidis–Spirakis** weighted reservoir
 sampling: give each ball the key `-ln(u) / w` and take the five smallest. This is exact for
 weighted draw-without-replacement and handles exclusions and pinned numbers with no special

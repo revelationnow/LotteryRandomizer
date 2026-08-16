@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { GAMES } from '../lib/games';
-import { useGameData } from '../lib/useGameData';
+import { useGameData, useWeightedStats } from '../lib/useGameData';
+import { sliderToHalfLife } from '../lib/weights';
 import { rankBalls, type ChiSquareResult, type PoolStats } from '../lib/stats';
 import { Panel, Stat } from '../components/ui';
 import { DataBadge } from '../components/DataBadge';
@@ -10,14 +11,21 @@ type Pool = 'white' | 'special';
 
 export function Observatory() {
   const gameId = useStore((s) => s.game);
+  const recency = useStore((s) => s.controls.recency);
   const { data, error } = useGameData(gameId);
+  const halfLife = sliderToHalfLife(recency);
+  const weighted = useWeightedStats(gameId, data?.snapshot ?? null, halfLife);
   const [pool, setPool] = useState<Pool>('white');
   const game = GAMES[gameId];
 
   if (error) return <Panel title="Could not load draw history">{error}</Panel>;
   if (!data) return <Panel title="Reading the sky…">Loading draw history.</Panel>;
 
-  const stats = pool === 'white' ? data.white : data.special;
+  // The frequency views follow the recency setting so that what is shown here is
+  // what the generator is actually drawing from. The fairness verdict below keeps
+  // using the full undecayed history — see VerdictCard.
+  const allTime = pool === 'white' ? data.white : data.special;
+  const stats = weighted ? (pool === 'white' ? weighted.white : weighted.special) : allTime;
   const chi = pool === 'white' ? data.whiteChi : data.specialChi;
 
   return (
@@ -47,11 +55,18 @@ export function Observatory() {
         ))}
       </div>
 
-      <VerdictCard chi={chi} stats={stats} />
+      {/* Always the full undecayed history: a chi-square on decayed fractional
+          counts is not a valid test, and the question it answers — is this machine
+          fair? — is about all of the evidence, not a recent slice of it. */}
+      <VerdictCard chi={chi} stats={allTime} weightedView={stats.weighted} />
 
       <Panel
         title="Frequency map"
-        subtitle="Brightness is how far each number sits from its expected count. Hot numbers glow."
+        subtitle={
+          stats.weighted
+            ? `Weighted by recency — about ${Math.round(stats.effectiveDraws).toLocaleString()} draws' worth of recent evidence, which is what the generator is using.`
+            : 'Brightness is how far each number sits from its expected count. Hot numbers glow.'
+        }
       >
         <HeatGrid stats={stats} />
       </Panel>
@@ -77,7 +92,15 @@ export function Observatory() {
  * On real data this essentially always comes back "consistent with a fair machine",
  * which is exactly the honest thing for the app to say.
  */
-function VerdictCard({ chi, stats }: { chi: ChiSquareResult; stats: PoolStats }) {
+function VerdictCard({
+  chi,
+  stats,
+  weightedView,
+}: {
+  chi: ChiSquareResult;
+  stats: PoolStats;
+  weightedView: boolean;
+}) {
   const spread = useMemo(() => {
     if (stats.expected <= 0) return null;
     const ranked = rankBalls(stats);
@@ -123,6 +146,7 @@ function VerdictCard({ chi, stats }: { chi: ChiSquareResult; stats: PoolStats })
           hint={chi.uniform ? 'fair' : 'unusual'}
         />
         <Stat label="Draws" value={stats.draws.toLocaleString()} hint="in the current matrix" />
+
         <Stat
           label="Expected each"
           value={stats.expected.toFixed(1)}
@@ -133,6 +157,14 @@ function VerdictCard({ chi, stats }: { chi: ChiSquareResult; stats: PoolStats })
           }
         />
       </div>
+
+      {weightedView && (
+        <p className="mt-3 text-xs leading-relaxed text-faint">
+          This verdict uses the full draw history, not your recency window. Narrowing the window
+          cannot make a fair machine unfair — it just leaves fewer draws to judge it by, so the
+          apparent gaps grow while meaning less.
+        </p>
+      )}
     </Panel>
   );
 }
@@ -221,7 +253,12 @@ function Leaderboard({
               </>
             ) : (
               <>
-                <span className="tabular text-ink">{r.count}</span> times
+                {/* Recency-weighted counts are fractional sums, not tallies of
+                    events, so they read as a weight rather than "N times". */}
+                <span className="tabular text-ink">
+                  {stats.weighted ? r.count.toFixed(1) : r.count}
+                </span>{' '}
+                {stats.weighted ? 'weight' : 'times'}
                 <span className="text-faint"> · {(r.ratio * 100).toFixed(0)}% of expected</span>
               </>
             )}

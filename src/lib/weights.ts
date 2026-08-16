@@ -24,6 +24,37 @@ export function sliderToBeta(slider: number): number {
   return (clamp(slider, -100, 100) / 100) * MAX_BIAS_EXPONENT;
 }
 
+/**
+ * Recency slider (0..100) to a decay half-life measured in draws.
+ *
+ * 0 means no decay at all — the whole eligible history counts equally, which is
+ * the original behaviour. Above that the half-life falls on a log scale, because
+ * the interesting range spans two orders of magnitude and a linear mapping would
+ * spend most of the travel in territory that looks identical.
+ */
+export const RECENCY_MAX_HALF_LIFE = 5000;
+export const RECENCY_MIN_HALF_LIFE = 20;
+
+export function sliderToHalfLife(slider: number): number | null {
+  const s = clamp(slider, 0, 100);
+  if (s <= 0) return null;
+  const ratio = RECENCY_MIN_HALF_LIFE / RECENCY_MAX_HALF_LIFE;
+  return RECENCY_MAX_HALF_LIFE * Math.pow(ratio, s / 100);
+}
+
+/**
+ * How many equally-weighted draws carry the same information as an infinitely
+ * long history decayed at this half-life — the Kish effective sample size.
+ *
+ * Used to tell the user, in plain numbers, how much evidence a recency setting
+ * actually leaves them with. It shrinks fast, and the UI says so.
+ */
+export function effectiveWindow(halfLife: number | null): number | null {
+  if (halfLife == null || !Number.isFinite(halfLife)) return null;
+  const r = Math.pow(0.5, 1 / halfLife);
+  return (1 + r) / (1 - r);
+}
+
 export function clamp(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n));
 }

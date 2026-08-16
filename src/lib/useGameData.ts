@@ -104,3 +104,48 @@ export function useGameData(gameId: GameId) {
 
   return { data, error, loading: !data && !error };
 }
+
+export interface WeightedStats {
+  white: PoolStats;
+  special: PoolStats;
+}
+
+/**
+ * Per-pool statistics with recency decay applied.
+ *
+ * Kept separate from the cached all-time stats because the half-life is a live
+ * user control. Results are memoised per (snapshot, half-life) so dragging the
+ * slider back and forth re-tallies each distinct value only once — the slider is
+ * stepped, so nearly every move after the first is a cache hit.
+ */
+const weightedCache = new WeakMap<Snapshot, Map<number, WeightedStats>>();
+
+export function useWeightedStats(
+  gameId: GameId,
+  snapshot: Snapshot | null,
+  halfLife: number | null,
+): WeightedStats | null {
+  return useMemo(() => {
+    if (!snapshot) return null;
+
+    // No decay is the common case and already cached by the all-time derivation.
+    const key = halfLife == null ? 0 : Math.round(halfLife);
+    let perSnapshot = weightedCache.get(snapshot);
+    if (!perSnapshot) {
+      perSnapshot = new Map();
+      weightedCache.set(snapshot, perSnapshot);
+    }
+    const hit = perSnapshot.get(key);
+    if (hit) return hit;
+
+    const game = GAMES[gameId];
+    const era = game.eras[0];
+    const options = { halfLife };
+    const value: WeightedStats = {
+      white: whiteStats(eligibleWhiteDraws(game, snapshot.draws), era.whiteMax, options),
+      special: specialStats(eligibleSpecialDraws(game, snapshot.draws), era.specialMax, options),
+    };
+    perSnapshot.set(key, value);
+    return value;
+  }, [gameId, snapshot, halfLife]);
+}

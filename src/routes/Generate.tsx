@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from '../router';
 import { useStore } from '../store';
 import { GAMES } from '../lib/games';
-import { useGameData } from '../lib/useGameData';
+import { useGameData, useWeightedStats } from '../lib/useGameData';
 import { useIsDesktop } from '../lib/useMediaQuery';
 import { generateTickets, validate, type Ticket } from '../lib/constraints';
-import { sliderToBeta } from '../lib/weights';
+import { sliderToBeta, sliderToHalfLife } from '../lib/weights';
 import { newSeed } from '../lib/rng';
 import { Orb } from '../components/Orb';
 import { LuckPanel } from '../components/LuckPanel';
@@ -27,12 +27,17 @@ export function Generate() {
   const [spinning, setSpinning] = useState(false);
   const game = GAMES[gameId];
 
+  // Recency decay reshapes the counts the generator draws from. At recency 0 this
+  // is the same all-time tally the Observatory reports.
+  const halfLife = sliderToHalfLife(controls.recency);
+  const weighted = useWeightedStats(gameId, data?.snapshot ?? null, halfLife);
+
   const input = useMemo(() => {
-    if (!data) return null;
+    if (!data || !weighted) return null;
     return {
       game,
-      whiteStats: data.white,
-      specialStats: data.special,
+      whiteStats: weighted.white,
+      specialStats: weighted.special,
       options: {
         beta: sliderToBeta(controls.bias),
         pinned: controls.pinned,
@@ -43,7 +48,7 @@ export function Generate() {
       },
       seed: controls.seed,
     };
-  }, [data, game, controls]);
+  }, [data, weighted, game, controls]);
 
   const configError = input ? validate(input) : null;
 

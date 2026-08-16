@@ -14,7 +14,12 @@ export interface PoolStats {
   draws: number;
   /** How many balls are drawn per draw (5 white, 1 special). */
   perDraw: number;
-  /** counts[b] = times ball b was drawn. */
+  /**
+   * counts[b] = appearances of ball b.
+   *
+   * Whole numbers normally. With recency decay these are weighted sums and so are
+   * fractional — which is why `weighted` stats must never be fed to chiSquare.
+   */
   counts: number[];
   /** Expected count per ball under a fair machine. */
   expected: number;
@@ -22,16 +27,38 @@ export interface PoolStats {
   drought: number[];
   /** Date of the most recent draw counted, or null when there are none. */
   latestDraw: number | null;
+  /** True when recency decay was applied, making the counts fractional. */
+  weighted: boolean;
+  /**
+   * Kish effective sample size: how many equally-weighted draws carry the same
+   * information as this decayed history. Equals `draws` when undecayed. This is
+   * the number that tells the user how thin the evidence has become.
+   */
+  effectiveDraws: number;
+}
+
+export interface TallyOptions {
+  /**
+   * Recency half-life, in draws. A draw n draws old contributes 0.5^(n/halfLife).
+   * null or Infinity means no decay — every draw counts equally.
+   */
+  halfLife?: number | null;
 }
 
 /**
  * Tally a pool. `pick` pulls the relevant balls out of a draw tuple, so the same
  * routine serves both the white pool and the special ball.
+ *
+ * Recency is modelled as exponential decay rather than a hard "last N draws"
+ * cutoff: a cutoff throws away everything one draw past the boundary and treats
+ * the draw just inside it as fully current, which makes the weights jump around
+ * as new draws arrive. Decay ages evidence out smoothly instead.
  */
 export function tally(
   draws: DrawTuple[],
   size: number,
   pick: (d: DrawTuple) => number[],
+  options: TallyOptions = {},
 ): PoolStats {
   const counts = new Array<number>(size + 1).fill(0);
   const lastSeen = new Array<number>(size + 1).fill(-1);
@@ -40,17 +67,28 @@ export function tally(
   // writes draws ascending, so check before paying for a copy and a sort.
   const ordered = isAscending(draws) ? draws : [...draws].sort((a, b) => a[0] - b[0]);
 
-  ordered.forEach((d, i) => {
-    for (const ball of pick(d)) {
+  const n = ordered.length;
+  const halfLife = options.halfLife;
+  const decaying = halfLife != null && Number.isFinite(halfLife) && halfLife > 0;
+
+  let totalWeight = 0;
+  let sumSquaredWeight = 0;
+
+  for (let i = 0; i < n; i++) {
+    // Age in draws: 0 is the most recent.
+    const weight = decaying ? Math.pow(0.5, (n - 1 - i) / halfLife) : 1;
+    totalWeight += weight;
+    sumSquaredWeight += weight * weight;
+
+    for (const ball of pick(ordered[i])) {
       if (ball >= 1 && ball <= size) {
-        counts[ball]++;
+        counts[ball] += weight;
         lastSeen[ball] = i;
       }
     }
-  });
+  }
 
-  const n = ordered.length;
-  const perDraw = ordered.length > 0 ? pick(ordered[0]).length : 0;
+  const perDraw = n > 0 ? pick(ordered[0]).length : 0;
   const drought = new Array<number>(size + 1).fill(n);
   for (let b = 1; b <= size; b++) {
     if (lastSeen[b] >= 0) drought[b] = n - 1 - lastSeen[b];
@@ -61,9 +99,12 @@ export function tally(
     draws: n,
     perDraw,
     counts,
-    expected: n > 0 ? (perDraw * n) / size : 0,
+    expected: n > 0 ? (perDraw * totalWeight) / size : 0,
     drought,
     latestDraw: n > 0 ? ordered[n - 1][0] : null,
+    weighted: decaying,
+    effectiveDraws:
+      sumSquaredWeight > 0 ? (totalWeight * totalWeight) / sumSquaredWeight : 0,
   };
 }
 
@@ -74,12 +115,12 @@ function isAscending(draws: DrawTuple[]): boolean {
   return true;
 }
 
-export function whiteStats(draws: DrawTuple[], size: number): PoolStats {
-  return tally(draws, size, (d) => d.slice(1, 6));
+export function whiteStats(draws: DrawTuple[], size: number, options?: TallyOptions): PoolStats {
+  return tally(draws, size, (d) => d.slice(1, 6), options);
 }
 
-export function specialStats(draws: DrawTuple[], size: number): PoolStats {
-  return tally(draws, size, (d) => [d[6]]);
+export function specialStats(draws: DrawTuple[], size: number, options?: TallyOptions): PoolStats {
+  return tally(draws, size, (d) => [d[6]], options);
 }
 
 export interface ChiSquareResult {
@@ -92,6 +133,12 @@ export interface ChiSquareResult {
 
 export function chiSquare(stats: PoolStats): ChiSquareResult {
   const { counts, size, expected } = stats;
+  if (stats.weighted) {
+    // Pearson's chi-square assumes actual counts; on decayed fractional weights the
+    // statistic no longer follows a chi-square distribution and the p-value would be
+    // meaningless. The fairness verdict must always be computed on raw history.
+    throw new Error('chiSquare requires unweighted counts — pass stats tallied without decay.');
+  }
   if (expected <= 0) return { chi2: 0, df: Math.max(size - 1, 0), pValue: 1, uniform: true };
 
   let chi2 = 0;
