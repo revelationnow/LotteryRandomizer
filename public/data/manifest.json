@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-28T19:06:50.667Z",
+  "generatedAt": "2026-08-29T12:51:25.448Z",
   "source": "socrata",
   "games": {
     "powerball": {
@@ -7,8 +7,8 @@
       "latestDraw": "2026-08-26"
     },
     "megamillions": {
-      "draws": 2531,
-      "latestDraw": "2026-08-25"
+      "draws": 2532,
+      "latestDraw": "2026-08-28"
     }
   }
 }
