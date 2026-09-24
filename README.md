@@ -212,3 +212,9 @@ that prove it is all chance are more interesting than pretending otherwise.
 
 Prize amounts shown in the Vault are typical advertised base prizes and vary by jurisdiction.
 Play responsibly. If gambling stops being fun, call 1-800-GAMBLER.
+
+## Also in this repository: RTSim
+
+[`rtsim/`](rtsim/) is a separate, self-contained app: a discrete-event simulator for scoping
+real-time hardware (processors, buses, memories, DMA and task workplans with deadlines). It has its
+own `package.json`; see [`rtsim/README.md`](rtsim/README.md).
