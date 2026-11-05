@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-11-04T14:55:32.268Z",
+  "generatedAt": "2026-11-05T14:59:49.253Z",
   "source": "socrata",
   "games": {
     "powerball": {
-      "draws": 2020,
-      "latestDraw": "2026-11-02"
+      "draws": 2021,
+      "latestDraw": "2026-11-04"
     },
     "megamillions": {
       "draws": 2554,
